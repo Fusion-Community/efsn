@@ -141,7 +141,7 @@ func (eth *Ethereum) stateAtBlock(block *types.Block, reexec uint64, base *state
 			return nil, fmt.Errorf("stateAtBlock commit failed, number %d root %v: %w",
 				current.NumberU64(), current.Root().Hex(), err)
 		}
-		statedb, err = state.New(root, common.Hash{}, database)
+		statedb, err = state.New(root, current.MixDigest(), database)
 		if err != nil {
 			return nil, fmt.Errorf("state reset after block %d failed: %v", current.NumberU64(), err)
 		}
