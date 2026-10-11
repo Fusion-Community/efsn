@@ -1,5 +1,5 @@
 name: Build-And-Test
-on: [push]
+on: [push, pull_request]
 jobs:
 
   build:
@@ -12,3 +12,13 @@ jobs:
         go-version: '1.19'
         check-latest: true
     - run: make all
+
+  tracing:
+    name: Historical tracing
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v3
+      with:
+        go-version: '1.21.3'
+    - run: go test -mod=readonly -race -count=1 -timeout=120s ./tests/tracing
