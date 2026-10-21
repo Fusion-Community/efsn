@@ -17,7 +17,6 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
 	cmath "github.com/FusionFoundation/efsn/v5/common/math"
 	"math"
@@ -31,6 +30,7 @@ import (
 	"github.com/FusionFoundation/efsn/v5/core/types"
 	"github.com/FusionFoundation/efsn/v5/core/vm"
 	"github.com/FusionFoundation/efsn/v5/crypto"
+	"github.com/FusionFoundation/efsn/v5/internal/logjson"
 	"github.com/FusionFoundation/efsn/v5/log"
 	"github.com/FusionFoundation/efsn/v5/params"
 	"github.com/FusionFoundation/efsn/v5/rlp"
@@ -1506,7 +1506,7 @@ func (st *StateTransition) addLog(typ common.FSNCallFunc, value interface{}, key
 		maps[keyValues[i].Key] = keyValues[i].Value
 	}
 
-	data, _ := json.Marshal(maps)
+	data, _ := logjson.Marshal(maps)
 
 	topic := common.Hash{}
 	topic[common.HashLength-1] = (uint8)(typ)

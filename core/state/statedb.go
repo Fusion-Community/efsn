@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"github.com/FusionFoundation/efsn/v5/core/rawdb"
 	"io"
@@ -32,6 +31,7 @@ import (
 	"github.com/FusionFoundation/efsn/v5/common"
 	"github.com/FusionFoundation/efsn/v5/core/types"
 	"github.com/FusionFoundation/efsn/v5/crypto"
+	"github.com/FusionFoundation/efsn/v5/internal/logjson"
 	"github.com/FusionFoundation/efsn/v5/internal/ticketgzip"
 	"github.com/FusionFoundation/efsn/v5/log"
 	"github.com/FusionFoundation/efsn/v5/rlp"
@@ -504,7 +504,7 @@ func (s *StateDB) ProcessMatureFSN(addr common.Address, timestamp, blockNbr uint
 			tlp["Type"] = common.TimeLockToAsset
 			tlp["Value"] = matureBalance
 
-			data, _ := json.Marshal(tlp)
+			data, _ := logjson.Marshal(tlp)
 			s.AddLog(&types.Log{
 				Address:     common.FSNCallAddress,
 				Topics:      []common.Hash{topic},
