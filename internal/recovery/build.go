@@ -98,6 +98,17 @@ func Build(chain Chain, plan Plan, txs types.Transactions) (*Candidate, error) {
 	if err != nil {
 		return nil, err
 	}
+	parentState, err := chain.StateAt(parent.Root, parent.MixDigest)
+	if err != nil {
+		return nil, err
+	}
+	selected, err := parentState.GetTicket(snapshot.Selected)
+	if err != nil {
+		return nil, fmt.Errorf("selected ticket unavailable: %w", err)
+	}
+	if selected.ExpireTime < header.Time {
+		return nil, fmt.Errorf("selected ticket %s expires before the planned timestamp", snapshot.Selected.Hex())
+	}
 	return &Candidate{Block: block, Receipt: receipt, Ticket: *ticket, Selected: snapshot.Selected, Retreat: snapshot.Retreat}, nil
 }
 
