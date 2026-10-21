@@ -303,8 +303,6 @@ func geth(ctx *cli.Context) error {
 // it unlocks any requested accounts, and starts the RPC/IPC interfaces and the
 // miner.
 func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend) {
-	debug.Memsize.Add("node", stack)
-
 	// add more log and checking in devnet
 	if ctx.Bool(utils.DevnetFlag.Name) {
 		common.InitDevnet()
