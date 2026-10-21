@@ -745,6 +745,15 @@ func (dt *DaTong) getAllTickets(chain consensus.ChainReader, header *types.Heade
 	return tickets, nil
 }
 
+// SigningPayload returns the encoding signed by Seal, which differs from SealHash.
+// It does not validate the header's consensus eligibility.
+func SigningPayload(header *types.Header) ([]byte, error) {
+	if header == nil || header.Number == nil || header.Number.Sign() <= 0 || header.Difficulty == nil || header.Difficulty.Sign() < 0 || len(header.Extra) < extraSeal {
+		return nil, errors.New("incomplete DaTong signing header")
+	}
+	return sigRlp(header), nil
+}
+
 func sigRlp(header *types.Header) (result []byte) {
 	result, _ = rlp.EncodeToBytes([]interface{}{
 		header.ParentHash,
