@@ -32,6 +32,7 @@ import (
 	"github.com/FusionFoundation/efsn/v5/common"
 	"github.com/FusionFoundation/efsn/v5/core/types"
 	"github.com/FusionFoundation/efsn/v5/crypto"
+	"github.com/FusionFoundation/efsn/v5/internal/ticketgzip"
 	"github.com/FusionFoundation/efsn/v5/log"
 	"github.com/FusionFoundation/efsn/v5/rlp"
 	"github.com/FusionFoundation/efsn/v5/trie"
@@ -163,16 +164,7 @@ func calcTicketsStorageData(tickets common.TicketsDataSlice) ([]byte, error) {
 		return nil, fmt.Errorf("Unable to encode tickets. err: %v", err)
 	}
 
-	var buf bytes.Buffer
-	zw := gzip.NewWriter(&buf)
-	if _, err := zw.Write(blob); err != nil {
-		return nil, fmt.Errorf("Unable to zip tickets data")
-	}
-	if err := zw.Close(); err != nil {
-		return nil, fmt.Errorf("Unable to zip tickets")
-	}
-	data := buf.Bytes()
-	return data, nil
+	return ticketgzip.Encode(blob)
 }
 
 func AddCachedTickets(hash common.Hash, tickets common.TicketsDataSlice) error {
