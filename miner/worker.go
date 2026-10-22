@@ -989,6 +989,13 @@ func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 	result := make([]*types.Receipt, len(receipts))
 	for i, l := range receipts {
 		cpy := *l
+		if l.Logs != nil {
+			cpy.Logs = make([]*types.Log, len(l.Logs))
+			for j, entry := range l.Logs {
+				entryCopy := *entry
+				cpy.Logs[j] = &entryCopy
+			}
+		}
 		result[i] = &cpy
 	}
 	return result
