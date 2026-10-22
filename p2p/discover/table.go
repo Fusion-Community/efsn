@@ -553,6 +553,9 @@ func (tab *Table) bucket(sha common.Hash) *bucket {
 //
 // The caller must not hold tab.mutex.
 func (tab *Table) add(n *Node) {
+	if n.ID == tab.self.ID {
+		return
+	}
 	tab.mutex.Lock()
 	defer tab.mutex.Unlock()
 
