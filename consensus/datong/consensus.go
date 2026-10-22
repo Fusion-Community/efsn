@@ -203,7 +203,7 @@ func (dt *DaTong) verifyHeader(chain consensus.ChainReader, header *types.Header
 // VerifyHeader checks whether a header conforms to the consensus rules of the
 // stock Ethereum ethash engine.
 func (dt *DaTong) VerifyHeader(chain consensus.ChainReader, header *types.Header, seal bool) error {
-	return dt.verifyHeader(chain, header, seal, glb_parents)
+	return dt.verifyHeader(chain, header, seal, nil)
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
@@ -236,12 +236,6 @@ func (dt *DaTong) VerifyUncles(chain consensus.ChainReader, block *types.Block) 
 // in the header satisfies the consensus protocol requirements.
 func (c *DaTong) VerifySeal(chain consensus.ChainReader, header *types.Header) error {
 	return c.verifySeal(chain, header, nil)
-}
-
-var glb_parents []*types.Header
-
-func SetHeaders(parents []*types.Header) {
-	glb_parents = parents
 }
 
 func getParent(chain consensus.ChainReader, header *types.Header, parents []*types.Header) (*types.Header, error) {
@@ -373,7 +367,7 @@ func (s DistanceSlice) Swap(i, j int) {
 // consensus rules that happen at finalization (e.g. block rewards).
 func (dt *DaTong) Finalize(chain consensus.ChainReader, header *types.Header, statedb *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
-	parent, err := getParent(chain, header, glb_parents)
+	parent, err := getParent(chain, header, nil)
 	if err != nil {
 		return nil, err
 	}

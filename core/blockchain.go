@@ -1451,12 +1451,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		bstart := time.Now()
 
 		//err := <-results
-		datong.SetHeaders(headers[:i])
 		err := bc.engine.VerifyHeader(bc, block.RawHeader(), seals[i])
 		if err == nil {
 			err = bc.Validator().ValidateBody(block)
 		}
-		datong.SetHeaders(nil)
 		switch {
 		case err == ErrKnownBlock:
 			// Block and state both already known. However if the current block is below
@@ -1535,9 +1533,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		err = bc.engine.PreProcess(bc, headers[i], state)
 
 		// Process block using the parent state as reference point.
-		datong.SetHeaders(headers[:i])
 		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
-		datong.SetHeaders(nil)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err

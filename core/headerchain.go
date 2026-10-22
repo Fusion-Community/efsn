@@ -245,14 +245,10 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 		}
 		seals[index] = true
 	}
-	headers := make([]*types.Header, len(chain))
-	for i, header := range chain {
-		headers[i] = header
-	}
 	seals[len(seals)-1] = true // Last should always be verified to avoid junk
 
-	// abort, results := hc.engine.VerifyHeaders(hc, chain, seals)
-	// defer close(abort)
+	abort, results := hc.engine.VerifyHeaders(hc, chain, seals)
+	defer close(abort)
 
 	// Iterate over the headers and ensure they all check out
 	for i, header := range chain {
@@ -266,10 +262,7 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 			return i, ErrBannedHash
 		}
 		// Otherwise wait for headers checks and ensure they pass
-		datong.SetHeaders(headers[:i])
-		err := hc.engine.VerifyHeader(hc, headers[i], seals[i])
-		datong.SetHeaders(nil)
-		if err != nil {
+		if err := <-results; err != nil {
 			return i, err
 		}
 	}
