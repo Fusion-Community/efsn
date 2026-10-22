@@ -50,6 +50,7 @@ func TestTable_pingReplace(t *testing.T) {
 func testPingReplace(t *testing.T, newNodeIsResponding, lastInBucketIsResponding bool) {
 	transport := newPingRecorder()
 	tab, _ := newTable(transport, NodeID{}, &net.UDPAddr{}, "", nil)
+	go tab.loop()
 	defer tab.Close()
 
 	<-tab.initDone
@@ -135,6 +136,7 @@ func TestBucket_bumpNoDuplicates(t *testing.T) {
 func TestTable_IPLimit(t *testing.T) {
 	transport := newPingRecorder()
 	tab, _ := newTable(transport, NodeID{}, &net.UDPAddr{}, "", nil)
+	go tab.loop()
 	defer tab.Close()
 
 	for i := 0; i < tableIPLimit+1; i++ {
@@ -151,6 +153,7 @@ func TestTable_IPLimit(t *testing.T) {
 func TestTable_BucketIPLimit(t *testing.T) {
 	transport := newPingRecorder()
 	tab, _ := newTable(transport, NodeID{}, &net.UDPAddr{}, "", nil)
+	go tab.loop()
 	defer tab.Close()
 
 	d := 3
@@ -223,6 +226,7 @@ func TestTable_closest(t *testing.T) {
 		// for any node table, Target and N
 		transport := newPingRecorder()
 		tab, _ := newTable(transport, test.Self, &net.UDPAddr{}, "", nil)
+		go tab.loop()
 		defer tab.Close()
 		tab.stuff(test.All)
 
@@ -283,6 +287,7 @@ func TestTable_ReadRandomNodesGetAll(t *testing.T) {
 	test := func(buf []*Node) bool {
 		transport := newPingRecorder()
 		tab, _ := newTable(transport, NodeID{}, &net.UDPAddr{}, "", nil)
+		go tab.loop()
 		defer tab.Close()
 		<-tab.initDone
 
@@ -328,6 +333,7 @@ func (*closeTest) Generate(rand *rand.Rand, size int) reflect.Value {
 func TestTable_Lookup(t *testing.T) {
 	self := nodeAtDistance(common.Hash{}, 0)
 	tab, _ := newTable(lookupTestnet, self.ID, &net.UDPAddr{}, "", nil)
+	go tab.loop()
 	defer tab.Close()
 
 	// lookup on empty table returns no nodes

@@ -129,7 +129,6 @@ func newTable(t transport, ourID NodeID, ourAddr *net.UDPAddr, nodeDBPath string
 	// seed nodes also considers older nodes that would otherwise be removed by the
 	// expiration.
 	tab.db.ensureExpirer()
-	go tab.loop()
 	return tab, nil
 }
 

@@ -259,6 +259,7 @@ func newUDP(c conn, cfg Config) (*Table, *udp, error) {
 
 	go udp.loop()
 	go udp.readLoop(cfg.Unhandled)
+	go tab.loop()
 	return udp.Table, udp, nil
 }
 
