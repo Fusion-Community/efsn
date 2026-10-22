@@ -15,14 +15,15 @@ import (
 var (
 	// hard coded check points
 	mainnetCheckPoints = map[uint64]common.Hash{
-		10000:   common.HexToHash("0x1830e440e17cda3a26d02ea650331a584d58a499cbbd3821c622568c8de9b470"),
-		100000:  common.HexToHash("0x0e4a4045c06984472f86bb8f1e40bb70dee87b6227877ffcaeab7624db745cd2"),
-		500000:  common.HexToHash("0xad25bc52b8e674494970aa3a1bb7e775564714cbc4798975730ad1b9c62ccc89"),
-		739500:  common.HexToHash("0xa64a4ecee941a7710d2942ac7e1b69e7ba6431ab38d82e6771ede7051bafee8f"),
-		1000000: common.HexToHash("0x4b0d0d5a0739c801c3d4fe91258d3b9ddf81f471464e221921442ea503d711a6"),
-		1500000: common.HexToHash("0x2808c2f24aa2280453e257970a9cf05ef9a4cf5c1a742a9a466a633aff45400a"),
-		1700000: common.HexToHash("0x39a997b94b24a050a3b222cd89427cdffedc8706a24160e6bab06ffa95f1c7fa"),
-		2680000: common.HexToHash("0x4c49d0119abea53f5cb0ba6107bf481670397e8b814fa4360353eedded9bf383"),
+		10000:    common.HexToHash("0x1830e440e17cda3a26d02ea650331a584d58a499cbbd3821c622568c8de9b470"),
+		100000:   common.HexToHash("0x0e4a4045c06984472f86bb8f1e40bb70dee87b6227877ffcaeab7624db745cd2"),
+		500000:   common.HexToHash("0xad25bc52b8e674494970aa3a1bb7e775564714cbc4798975730ad1b9c62ccc89"),
+		739500:   common.HexToHash("0xa64a4ecee941a7710d2942ac7e1b69e7ba6431ab38d82e6771ede7051bafee8f"),
+		1000000:  common.HexToHash("0x4b0d0d5a0739c801c3d4fe91258d3b9ddf81f471464e221921442ea503d711a6"),
+		1500000:  common.HexToHash("0x2808c2f24aa2280453e257970a9cf05ef9a4cf5c1a742a9a466a633aff45400a"),
+		1700000:  common.HexToHash("0x39a997b94b24a050a3b222cd89427cdffedc8706a24160e6bab06ffa95f1c7fa"),
+		2680000:  common.HexToHash("0x4c49d0119abea53f5cb0ba6107bf481670397e8b814fa4360353eedded9bf383"),
+		15130080: common.HexToHash("0xe93ffded087a79097d4309c7831690161db6ed136f4b1a22c4c83a99db80f99f"),
 	}
 	mainnetLastCheckPoint uint64 = 2680000
 
@@ -103,19 +104,17 @@ func CheckPoint(chainID *big.Int, blockHeight uint64, blockHash common.Hash) (is
 	if chainID == nil || chainID.Cmp(defaultChainID) != 0 {
 		return false, nil
 	}
-	if blockHeight > LastCheckPoint {
-		return false, nil
-	}
+	isInRange = blockHeight <= LastCheckPoint
 	hash, exist := CheckPoints[blockHeight]
 	if exist {
 		if blockHash != hash {
 			log.Info("check point failed, block hash mismatch", "number", blockHeight, "have", blockHash, "want", hash)
-			return true, fmt.Errorf("check point failed, block hash mismatch: number=%v, have 0x%x, want 0x%x", blockHeight, blockHash, hash)
+			return isInRange, fmt.Errorf("check point failed, block hash mismatch: number=%v, have 0x%x, want 0x%x", blockHeight, blockHash, hash)
 		} else {
 			log.Info("check point passed", "number", blockHeight, "hash", blockHash)
 		}
 	}
-	return true, nil
+	return isInRange, nil
 }
 
 func CheckPointsInBlockChain(chainID *big.Int, chain types.Blocks) (int, error) {
@@ -142,9 +141,6 @@ func CheckPointsInHeaderChain(chainID *big.Int, chain []*types.Header) (int, err
 	}
 	for i, header := range chain {
 		blockHeight := header.Number.Uint64()
-		if blockHeight > LastCheckPoint {
-			break
-		}
 		hash, exist := CheckPoints[blockHeight]
 		if !exist {
 			continue
@@ -158,4 +154,25 @@ func CheckPointsInHeaderChain(chainID *big.Int, chain []*types.Header) (int, err
 		}
 	}
 	return 0, nil
+}
+
+func IsCheckPointRollback(chainID *big.Int, oldHead, newHead uint64) bool {
+	var defaultChainID *big.Int
+	switch {
+	case common.UseTestnetRule:
+		defaultChainID = params.DevnetChainConfig.ChainID
+	case common.UseDevnetRule:
+		defaultChainID = params.TestnetChainConfig.ChainID
+	default: // maininet
+		defaultChainID = params.MainnetChainConfig.ChainID
+	}
+	if chainID == nil || chainID.Cmp(defaultChainID) != 0 {
+		return false
+	}
+	for height := range CheckPoints {
+		if newHead < height && height <= oldHead {
+			return true
+		}
+	}
+	return false
 }

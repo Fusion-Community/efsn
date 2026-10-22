@@ -1650,6 +1650,9 @@ func countTransactions(chain []*types.Block) (c int) {
 // to be part of the new canonical chain and accumulates potential missing transactions and post an
 // event about them
 func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
+	if datong.IsCheckPointRollback(bc.chainConfig.ChainID, oldBlock.NumberU64(), newBlock.NumberU64()) {
+		return fmt.Errorf("reorganization below check point refused: head %d, new head %d", oldBlock.NumberU64(), newBlock.NumberU64())
+	}
 	var (
 		newChain    types.Blocks
 		oldChain    types.Blocks
