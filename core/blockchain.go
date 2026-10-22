@@ -328,12 +328,32 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 
-	// Rewind the header chain, deleting all block bodies until then
+	currentBlock, currentFastBlock := bc.CurrentBlock(), bc.CurrentFastBlock()
+	updateFn := func(db ethdb.KeyValueWriter, header *types.Header) {
+		if currentBlock != nil && header.Number.Uint64() < currentBlock.NumberU64() {
+			currentBlock = bc.GetBlock(header.Hash(), header.Number.Uint64())
+		}
+		if currentBlock == nil {
+			currentBlock = bc.genesisBlock
+		}
+		if err := bc.repair(&currentBlock); err != nil {
+			currentBlock = bc.genesisBlock
+		}
+		if currentFastBlock != nil && header.Number.Uint64() < currentFastBlock.NumberU64() {
+			currentFastBlock = bc.GetBlock(header.Hash(), header.Number.Uint64())
+		}
+		if currentFastBlock == nil {
+			currentFastBlock = bc.genesisBlock
+		}
+		rawdb.WriteHeadBlockHash(db, currentBlock.Hash())
+		rawdb.WriteHeadFastBlockHash(db, currentFastBlock.Hash())
+	}
 	delFn := func(db ethdb.KeyValueWriter, hash common.Hash, num uint64) {
 		rawdb.DeleteBody(db, hash, num)
 	}
-	bc.hc.SetHead(head, delFn)
-	currentHeader := bc.hc.CurrentHeader()
+	bc.hc.setHead(head, updateFn, delFn)
+	bc.currentBlock.Store(currentBlock)
+	bc.currentFastBlock.Store(currentFastBlock)
 
 	// Clear out any stale content from the caches
 	bc.bodyCache.Purge()
@@ -342,38 +362,6 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	bc.blockCache.Purge()
 	bc.txLookupCache.Purge()
 	bc.futureBlocks.Purge()
-
-	// Rewind the block chain, ensuring we don't end up with a stateless head block
-	if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentHeader.Number.Uint64() < currentBlock.NumberU64() {
-		bc.currentBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64()))
-	}
-	if currentBlock := bc.CurrentBlock(); currentBlock != nil {
-		// Make sure the state associated with the block is available
-		err := bc.repair(&currentBlock)
-		if err == nil {
-			// Everything seems to be fine, set as the head block
-			bc.currentBlock.Store(currentBlock)
-		} else {
-			// Rewound state missing, rolled back to before pivot, reset to genesis
-			bc.currentBlock.Store(bc.genesisBlock)
-		}
-	}
-	// Rewind the fast block in a simpleton way to the target head
-	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentHeader.Number.Uint64() < currentFastBlock.NumberU64() {
-		bc.currentFastBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64()))
-	}
-	// If either blocks reached nil, reset to the genesis state
-	if currentBlock := bc.CurrentBlock(); currentBlock == nil {
-		bc.currentBlock.Store(bc.genesisBlock)
-	}
-	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock == nil {
-		bc.currentFastBlock.Store(bc.genesisBlock)
-	}
-	currentBlock := bc.CurrentBlock()
-	currentFastBlock := bc.CurrentFastBlock()
-
-	rawdb.WriteHeadBlockHash(bc.db, currentBlock.Hash())
-	rawdb.WriteHeadFastBlockHash(bc.db, currentFastBlock.Hash())
 
 	return bc.loadLastState()
 }
@@ -500,7 +488,7 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 // fast block are left intact.
 func (bc *BlockChain) repair(head **types.Block) error {
 	rewound := false
-	for {
+	for *head != nil {
 		blockNumber := (*head).Number()
 		// Abort if we've rewound to a head block that does have associated state
 		if _, err := bc.StateAt((*head).Root(), (*head).MixDigest()); err == nil {
@@ -511,10 +499,14 @@ func (bc *BlockChain) repair(head **types.Block) error {
 		} else if !rewound {
 			log.Warn("Head state missing, repairing chain", "number", blockNumber, "hash", (*head).Hash())
 		}
+		if blockNumber.Sign() == 0 {
+			return errors.New("genesis state missing while repairing chain")
+		}
 		// Otherwise rewind one block and recheck state availability there
 		(*head) = bc.GetBlock((*head).ParentHash(), blockNumber.Uint64()-1)
 		rewound = true
 	}
+	return errors.New("ancestor block missing while repairing chain")
 }
 
 // Export writes the active chain to the given writer.
