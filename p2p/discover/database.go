@@ -358,6 +358,7 @@ func nextNode(it iterator.Iterator) *Node {
 			log.Warn("Failed to decode node RLP", "id", id, "err", err)
 			continue
 		}
+		n.sha = crypto.Keccak256Hash(n.ID[:])
 		return &n
 	}
 	return nil
