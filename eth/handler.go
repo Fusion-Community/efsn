@@ -761,6 +761,14 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 	}
 }
 
+func (pm *ProtocolManager) rebroadcastTx(tx *types.Transaction) {
+	pm.peers.lock.RLock()
+	defer pm.peers.lock.RUnlock()
+	for _, peer := range pm.peers.peers {
+		peer.AsyncSendTransactions(types.Transactions{tx})
+	}
+}
+
 // Mined broadcast loop
 func (pm *ProtocolManager) minedBroadcastLoop() {
 	// automatically stops if unsubscribe

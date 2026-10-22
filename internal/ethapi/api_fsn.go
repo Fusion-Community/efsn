@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/FusionFoundation/efsn/v5/accounts"
@@ -21,10 +20,6 @@ import (
 	"github.com/FusionFoundation/efsn/v5/rlp"
 	"github.com/FusionFoundation/efsn/v5/rpc"
 )
-
-var lastBlockOfBuyTickets = int64(0)
-var buyTicketOnBlockMap map[common.Address]bool
-var buyTicketOnBlockMapMutex sync.Mutex
 
 //--------------------------------------------- PublicFusionAPI -------------------------------------
 
@@ -881,8 +876,8 @@ func (s *PublicFusionAPI) BuildBuyTicketSendTxArgs(ctx context.Context, args com
 		return nil, err
 	}
 
-	if doesTicketPurchaseExistsForBlock(header.Number.Int64(), args.From) {
-		return nil, fmt.Errorf("Purchase of BuyTicket for this block already submitted")
+	if pending := pendingTicketPurchase(s.b, args.From); pending != nil && (args.Nonce == nil || uint64(*args.Nonce) != pending.Nonce()) {
+		return nil, fmt.Errorf("Purchase of BuyTicket already pending: %s", pending.Hash().Hex())
 	}
 
 	parentTime := header.Time
@@ -1286,29 +1281,14 @@ func (s *PrivateFusionAPI) SendTimeLock(ctx context.Context, args common.TimeLoc
 	return s.papi.SendTransaction(ctx, *sendArgs, passwd)
 }
 
-/*
-* on our public gateways too many buyTickets are past through
-this cache of purchase on block will stop multiple purchase
-attempt on a block (which state_transistion also flags).
-the goals is to limit the number of buytickets being processed
-if it is know that they will fail anyway
-*/
-func doesTicketPurchaseExistsForBlock(blockNbr int64, from common.Address) bool {
-	buyTicketOnBlockMapMutex.Lock()
-	defer buyTicketOnBlockMapMutex.Unlock()
-	if lastBlockOfBuyTickets == 0 || lastBlockOfBuyTickets != blockNbr {
-		lastBlockOfBuyTickets = blockNbr
-		buyTicketOnBlockMap = make(map[common.Address]bool)
-	}
-	_, found := buyTicketOnBlockMap[from]
-	return found
-}
-
-// only record on purchase ticket successfully
-func addTicketPurchaseForBlock(from common.Address) {
-	buyTicketOnBlockMapMutex.Lock()
-	defer buyTicketOnBlockMapMutex.Unlock()
-	buyTicketOnBlockMap[from] = true
+func pendingTicketPurchase(b Backend, from common.Address) *types.Transaction {
+	return b.GetPoolTransactionByPredicate(func(tx *types.Transaction) bool {
+		if !tx.IsBuyTicketTx() {
+			return false
+		}
+		sender, err := types.Sender(types.LatestSigner(b.ChainConfig()), tx)
+		return err == nil && sender == from
+	})
 }
 
 // BuyTicket ss
@@ -1321,7 +1301,6 @@ func (s *PrivateFusionAPI) BuyTicket(ctx context.Context, args common.BuyTicketA
 	if err != nil {
 		return common.Hash{}, err
 	}
-	addTicketPurchaseForBlock(args.From)
 	return hash, err
 }
 
@@ -1433,8 +1412,15 @@ func AutoBuyTicket(enable bool) {
 	}
 	common.AutoBuyTicket = enable
 
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 	for {
-		<-common.AutoBuyTicketChan
+		rebroadcast := false
+		select {
+		case <-common.AutoBuyTicketChan:
+		case <-ticker.C:
+			rebroadcast = true
+		}
 	COMSUMEALL:
 		for {
 			select {
@@ -1452,6 +1438,12 @@ func AutoBuyTicket(enable bool) {
 
 		coinbase, err := fusionTransactionAPI.b.Coinbase()
 		if err == nil {
+			if pending := pendingTicketPurchase(fusionTransactionAPI.b, coinbase); pending != nil {
+				if rebroadcast {
+					fusionTransactionAPI.b.RebroadcastTx(pending)
+				}
+				continue
+			}
 			fbase := common.FusionBaseArgs{From: coinbase}
 			args := common.BuyTicketArgs{FusionBaseArgs: fbase}
 			fusionTransactionAPI.BuyTicket(context.TODO(), args)
@@ -1697,7 +1689,6 @@ func (s *FusionTransactionAPI) BuyTicket(ctx context.Context, args common.BuyTic
 	if err != nil {
 		return common.Hash{}, err
 	}
-	addTicketPurchaseForBlock(args.From)
 	return hash, err
 }
 

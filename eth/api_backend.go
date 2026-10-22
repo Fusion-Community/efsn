@@ -236,6 +236,12 @@ func (b *EthAPIBackend) GetPoolTransactionByPredicate(predicate func(*types.Tran
 	return b.eth.txPool.GetByPredicate(predicate)
 }
 
+func (b *EthAPIBackend) RebroadcastTx(tx *types.Transaction) {
+	if b.eth.txPool.Status([]common.Hash{tx.Hash()})[0] == core.TxStatusPending {
+		b.eth.protocolManager.rebroadcastTx(tx)
+	}
+}
+
 func (b *EthAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(b.eth.ChainDb(), txHash)
 	return tx, blockHash, blockNumber, index, nil
