@@ -578,7 +578,10 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to update chain indexes and markers", "err", err)
 	}
-	// Update all in-memory chain markers in the last step
+	bc.updateHeadBlock(block, updateHeads)
+}
+
+func (bc *BlockChain) updateHeadBlock(block *types.Block, updateHeads bool) {
 	if updateHeads {
 		bc.hc.SetCurrentHeader(block.Header())
 		bc.currentFastBlock.Store(block)
@@ -1725,6 +1728,9 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	if _, err := datong.CheckPointsInBlockChain(bc.chainConfig.ChainID, newChain); err != nil {
 		return err
 	}
+	if len(newChain) == 0 {
+		return fmt.Errorf("invalid reorganization: empty replacement chain")
+	}
 	// Ensure the user sees large reorgs
 	if len(oldChain) > 0 && len(newChain) > 0 {
 		logFn := log.Debug
@@ -1740,20 +1746,25 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	}
 	// Insert the new chain, taking care of the proper incremental order
 	var addedTxs types.Transactions
+	indexesBatch := bc.db.NewBatch()
 	for i := len(newChain) - 1; i >= 0; i-- {
-		// insert the block in the canonical way, re-writing history
-		bc.writeHeadBlock(newChain[i])
+		block := newChain[i]
+		if _, err := datong.CheckPoint(bc.chainConfig.ChainID, block.NumberU64(), block.Hash()); err != nil {
+			return err
+		}
+		rawdb.WriteCanonicalHash(indexesBatch, block.Hash(), block.NumberU64())
+		rawdb.WriteTxLookupEntriesByBlock(indexesBatch, block)
 		// Collect the new added transactions.
-		addedTxs = append(addedTxs, newChain[i].Transactions()...)
+		addedTxs = append(addedTxs, block.Transactions()...)
 	}
 	// Delete useless indexes right now which includes the non-canonical
 	// transaction indexes, canonical chain indexes which above the head.
-	indexesBatch := bc.db.NewBatch()
 	for _, tx := range types.TxDifference(deletedTxs, addedTxs) {
 		rawdb.DeleteTxLookupEntry(indexesBatch, tx.Hash())
 	}
 	// Delete any canonical number assignments above the new head
-	number := bc.CurrentBlock().NumberU64()
+	head := newChain[0]
+	number := head.NumberU64()
 	for i := number + 1; ; i++ {
 		hash := rawdb.ReadCanonicalHash(bc.db, i)
 		if hash == (common.Hash{}) {
@@ -1761,9 +1772,13 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		}
 		rawdb.DeleteCanonicalHash(indexesBatch, i)
 	}
+	rawdb.WriteHeadBlockHash(indexesBatch, head.Hash())
+	rawdb.WriteHeadHeaderHash(indexesBatch, head.Hash())
+	rawdb.WriteHeadFastBlockHash(indexesBatch, head.Hash())
 	if err := indexesBatch.Write(); err != nil {
-		log.Crit("Failed to delete useless indexes", "err", err)
+		log.Crit("Failed to write reorganized chain indexes and markers", "err", err)
 	}
+	bc.updateHeadBlock(head, true)
 
 	if len(deletedLogs) > 0 {
 		go bc.rmLogsFeed.Send(RemovedLogsEvent{deletedLogs})
