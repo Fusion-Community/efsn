@@ -333,7 +333,11 @@ func (t *udp) findnode(toid NodeID, toaddr *net.UDPAddr, target NodeID) ([]*Node
 		Target:     target,
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	})
-	return nodes, <-errc
+	err := <-errc
+	if err == errTimeout && len(nodes) > 0 {
+		err = nil
+	}
+	return nodes, err
 }
 
 // pending adds a reply callback to the pending reply queue.
