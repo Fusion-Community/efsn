@@ -71,6 +71,9 @@ func (snap *snapshot) SetBytes(data []byte) error {
 	if len(data) <= 0 {
 		return errors.New("Empty data")
 	}
+	if len(data) < 5 {
+		return errors.New("data length error")
+	}
 
 	realData := data[:len(data)-1]
 	check := data[len(data)-1]
