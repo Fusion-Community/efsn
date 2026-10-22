@@ -832,7 +832,8 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 	for _, url := range urls {
 		node, err := discover.ParseNode(url)
 		if err != nil {
-			log.Crit("Bootstrap URL invalid", "enode", url, "err", err)
+			log.Error("Bootstrap URL invalid", "enode", url, "err", err)
+			continue
 		}
 		cfg.BootstrapNodes = append(cfg.BootstrapNodes, node)
 	}
