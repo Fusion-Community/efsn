@@ -352,7 +352,9 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 	// clearPending cleans the stale pending tasks.
 	clearPending := func(block *types.Block) {
 		number := block.NumberU64()
+		w.mu.RLock()
 		sameMiner := block.Coinbase() == w.coinbase
+		w.mu.RUnlock()
 		w.pendingMu.Lock()
 		for h, t := range w.pendingTasks {
 			if t.block.NumberU64()+staleThreshold <= number {
@@ -431,7 +433,10 @@ func (w *worker) mainLoop() {
 	defer w.chainSideSub.Unsubscribe()
 
 	clearPending := func(block *types.Block) {
-		if block.Coinbase() == w.coinbase {
+		w.mu.RLock()
+		coinbase := w.coinbase
+		w.mu.RUnlock()
+		if block.Coinbase() == coinbase {
 			w.pendingMu.Lock()
 			for h, t := range w.pendingTasks {
 				if t.block.ParentHash() == block.ParentHash() {
