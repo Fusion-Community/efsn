@@ -118,7 +118,7 @@ func NewCustom(file string, namespace string, customize func(options *opt.Option
 
 	// Open the db and recover any potential corruptions
 	db, err := leveldb.OpenFile(file, options)
-	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
+	if _, corrupted := err.(*errors.ErrCorrupted); corrupted && !options.GetReadOnly() {
 		db, err = leveldb.RecoverFile(file, nil)
 	}
 	if err != nil {
