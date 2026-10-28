@@ -1414,6 +1414,7 @@ func AutoBuyTicket(enable bool) {
 
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	lastFailure := ""
 	for {
 		rebroadcast := false
 		select {
@@ -1446,7 +1447,15 @@ func AutoBuyTicket(enable bool) {
 			}
 			fbase := common.FusionBaseArgs{From: coinbase}
 			args := common.BuyTicketArgs{FusionBaseArgs: fbase}
-			fusionTransactionAPI.BuyTicket(context.TODO(), args)
+			_, err := fusionTransactionAPI.BuyTicket(context.TODO(), args)
+			failure := ""
+			if err != nil {
+				failure = err.Error()
+			}
+			if failure != "" && failure != lastFailure {
+				log.Warn("Automatic ticket purchase failed", "account", coinbase, "err", err)
+			}
+			lastFailure = failure
 		}
 	}
 }
