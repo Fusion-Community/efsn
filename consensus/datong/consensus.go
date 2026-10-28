@@ -3,6 +3,7 @@ package datong
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -490,6 +491,9 @@ func (dt *DaTong) Seal(chain consensus.ChainReader, block *types.Block, results 
 	if signer != header.Coinbase {
 		return errors.New("Mismatched Signer and Coinbase")
 	}
+	if last := dt.lastSealed(); number <= last {
+		return fmt.Errorf("refusing to seal block %d: this node already sealed block %d, so its head is older than its own chain; sync first", number, last)
+	}
 
 	// delay time decide block time
 	delay, errc := dt.calcDelayTime(chain, header)
@@ -510,6 +514,7 @@ func (dt *DaTong) Seal(chain consensus.ChainReader, block *types.Block, results 
 		case <-time.After(delay):
 		}
 
+		dt.recordSealed(number)
 		select {
 		case results <- block.WithSeal(header):
 		default:
@@ -518,6 +523,33 @@ func (dt *DaTong) Seal(chain consensus.ChainReader, block *types.Block, results 
 	}()
 
 	return nil
+}
+
+// lastSealedKey stores the highest block number this node has handed to the miner. It is
+// written to the database as soon as a block is sealed, so it survives a crash that loses
+// the unflushed state and rewinds the head.
+var lastSealedKey = []byte("datong-last-sealed")
+
+func (dt *DaTong) lastSealed() uint64 {
+	if dt.db == nil {
+		return 0
+	}
+	data, err := dt.db.Get(lastSealedKey)
+	if err != nil || len(data) != 8 {
+		return 0
+	}
+	return binary.BigEndian.Uint64(data)
+}
+
+func (dt *DaTong) recordSealed(number uint64) {
+	if dt.db == nil || number <= dt.lastSealed() {
+		return
+	}
+	data := make([]byte, 8)
+	binary.BigEndian.PutUint64(data, number)
+	if err := dt.db.Put(lastSealedKey, data); err != nil {
+		log.Error("Failed to record the sealed block number", "number", number, "err", err)
+	}
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
