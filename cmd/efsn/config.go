@@ -29,6 +29,8 @@ import (
 	"github.com/FusionFoundation/efsn/v5/accounts/keystore"
 	"github.com/FusionFoundation/efsn/v5/accounts/usbwallet"
 	"github.com/FusionFoundation/efsn/v5/cmd/utils"
+	"github.com/FusionFoundation/efsn/v5/common"
+	"github.com/FusionFoundation/efsn/v5/consensus/datong"
 	"github.com/FusionFoundation/efsn/v5/eth/ethconfig"
 	"github.com/FusionFoundation/efsn/v5/internal/ethapi"
 	"github.com/FusionFoundation/efsn/v5/internal/flags"
@@ -145,6 +147,15 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 }
 
 func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
+	// The check points must be known before the chain is opened: opening it rewinds a head
+	// that conflicts with a pinned block, and that check reads datong.CheckPoints.
+	if ctx.Bool(utils.DevnetFlag.Name) {
+		common.InitDevnet()
+	} else if ctx.Bool(utils.TestnetFlag.Name) {
+		common.InitTestnet()
+	}
+	datong.InitCheckPoints(ctx.String(utils.CheckPointsFileFlag.Name))
+
 	stack, cfg := makeConfigNode(ctx)
 
 	backend, _ := utils.RegisterEthService(stack, &cfg.Eth)

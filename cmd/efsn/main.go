@@ -29,8 +29,6 @@ import (
 	"github.com/FusionFoundation/efsn/v5/accounts"
 	"github.com/FusionFoundation/efsn/v5/accounts/keystore"
 	"github.com/FusionFoundation/efsn/v5/cmd/utils"
-	"github.com/FusionFoundation/efsn/v5/common"
-	"github.com/FusionFoundation/efsn/v5/consensus/datong"
 	"github.com/FusionFoundation/efsn/v5/console/prompt"
 	"github.com/FusionFoundation/efsn/v5/eth"
 	"github.com/FusionFoundation/efsn/v5/ethclient"
@@ -304,14 +302,6 @@ func geth(ctx *cli.Context) error {
 // miner.
 func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend) {
 	debug.Memsize.Add("node", stack)
-
-	// add more log and checking in devnet
-	if ctx.Bool(utils.DevnetFlag.Name) {
-		common.InitDevnet()
-	} else if ctx.Bool(utils.TestnetFlag.Name) {
-		common.InitTestnet()
-	}
-	datong.InitCheckPoints(ctx.String(utils.CheckPointsFileFlag.Name))
 
 	// Start up the node itself
 	utils.StartNode(stack)
